@@ -5,39 +5,74 @@ import subprocess
 import os
 import sys
 import cv2
-# Функция для синхронизации с GitHub
-def sync_with_github():
-    try:
-        # Проверяем, существует ли папка .git (чтобы убедиться, что это репозиторий)
-        if not os.path.exists(".git"):
-            print("Папка .git не найдена. Инициализация нового репозитория...")
-            subprocess.run(["git", "init"], check=True)
-            subprocess.run(["git", "remote", "add", "origin", "https://github.com/LikeProgramChel/Tetris-AI.git"], check=True)
+import mediapipe as mp
+import math
 
-        # Получаем последние изменения с GitHub
-        print("Получение изменений с GitHub...")
-        subprocess.run(["git", "fetch", "origin"], check=True)
-        subprocess.run(["git", "reset", "--hard", "origin/master"], check=True)
-        print("Синхронизация завершена.")
-        
-    except subprocess.CalledProcessError as e:
-        print(f"Ошибка при синхронизации с GitHub: {e}")
-        sys.exit(1)
+# Класс для распознавания рук
+class handDetector():
+    def __init__(self, mode=False, maxHands=2, modelComplexity=1, detectionCon=0.5, trackCon=0.5):
+        self.mode = mode
+        self.maxHands = maxHands
+        self.modelComplexity = modelComplexity
+        self.detectionCon = detectionCon
+        self.trackCon = trackCon
 
-# Синхронизация при запуске программы
-sync_with_github()
+        self.mpHands = mp.solutions.hands
+        self.hands = self.mpHands.Hands(self.mode, self.maxHands, self.modelComplexity, self.detectionCon, self.trackCon)
+        self.mpDraw = mp.solutions.drawing_utils
+        self.tipIds = [4, 8, 12, 16, 20]
 
-# Остальной код игры...
-colors = [
-    (255, 255, 255),
-    (120, 37, 179),
-    (100, 179, 179),
-    (80, 34, 22),
-    (80, 134, 22),
-    (180, 34, 22),
-    (180, 34, 122),
-]
+    def findHands(self, img, draw=True):
+        imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        self.results = self.hands.process(imgRGB)
 
+        if self.results.multi_hand_landmarks:
+            for handLms in self.results.multi_hand_landmarks:
+                if draw:
+                    self.mpDraw.draw_landmarks(img, handLms, self.mpHands.HAND_CONNECTIONS)
+        return img
+
+    def findPosition(self, img, handNo=0, draw=True):
+        xList = []
+        yList = []
+        bbox = []
+        self.lmList = []
+        if self.results.multi_hand_landmarks:
+            myHand = self.results.multi_hand_landmarks[handNo]
+            for id, lm in enumerate(myHand.landmark):
+                h, w, c = img.shape
+                cx, cy = int(lm.x * w), int(lm.y * h)
+                xList.append(cx)
+                yList.append(cy)
+                self.lmList.append([id, cx, cy])
+                if draw:
+                    cv2.circle(img, (cx, cy), 5, (255, 0, 255), cv2.FILLED)
+            xmin, xmax = min(xList), max(xList)
+            ymin, ymax = min(yList), max(yList)
+            bbox = xmin, ymin, xmax, ymax
+
+            if draw:
+                cv2.rectangle(img, (bbox[0] - 20, bbox[1] - 20), (bbox[2] + 20, bbox[3] + 20), (0, 255, 0), 2)
+        return self.lmList, bbox
+
+    def fingersUp(self):
+        fingers = []
+
+        # Thumb
+        if self.lmList[self.tipIds[0]][1] < self.lmList[self.tipIds[0] - 1][1]:
+            fingers.append(1)
+        else:
+            fingers.append(0)
+
+        # 4 Fingers
+        for id in range(1, 5):
+            if self.lmList[self.tipIds[id]][2] < self.lmList[self.tipIds[id] - 2][2]:
+                fingers.append(1)
+            else:
+                fingers.append(0)
+        return fingers
+
+# Класс для фигур в Тетрисе
 class Figure:
     x = 0
     y = 0
@@ -65,6 +100,7 @@ class Figure:
     def rotate(self):
         self.rotation = (self.rotation + 1) % len(self.figures[self.type])
 
+# Класс для игры Тетрис
 class Tetris:
     def __init__(self, height, width):
         self.level = 1
@@ -161,37 +197,46 @@ class Tetris:
     def save_game(self, filename):
         with open(filename, 'wb') as f:
             pickle.dump(self, f)
-    def restaer(self):
-        game.__init__(20, 10)
+
+    def restart(self):
+        self.__init__(20, 10)
 
     @staticmethod
     def load_game(filename):
         with open(filename, 'rb') as f:
             return pickle.load(f)
 
-# Initialize the game engine
+# Инициализация игры
 pygame.init()
-
-# Initialize the mixer module for sound
 pygame.mixer.init()
-
-# Load and play background music
 pygame.mixer.music.load('background_music.mp3')
-pygame.mixer.music.play(-1)  # -1 means the music will loop indefinitely
+pygame.mixer.music.play(-1)
 
-# Define some colors
+# Инициализация детектора рук
+detector = handDetector()
+
+# Определение цветов
+colors = [
+    (255, 255, 255),
+    (120, 37, 179),
+    (100, 179, 179),
+    (80, 34, 22),
+    (80, 134, 22),
+    (180, 34, 22),
+    (180, 34, 122),
+]
+
 WHITE = (0, 0, 0)
 BLACK = (255, 255, 255)
 GRAY = (128, 128, 128)
 BUTTON_COLOR = (100, 100, 100)
 BUTTON_HOVER_COLOR = (150, 150, 150)
 
-size = (1000, 600)  # Увеличиваем ширину экрана для боковой панели
+size = (1000, 600)
 screen = pygame.display.set_mode(size)
-
 pygame.display.set_caption("Tetris")
 
-# Loop until the user clicks the close button.
+# Основной цикл игры
 done = False
 clock = pygame.time.Clock()
 fps = 25
@@ -200,20 +245,11 @@ counter = 0
 
 pressing_down = False
 
-# Параметры кнопок
-button_width = 200
-button_height = 50
-button_x = 820  # Позиция кнопок по X
-button_y1 = 100  # Позиция первой кнопки по Y
-button_y2 = 200  # Позиция второй кнопки по Y
-button_y3 = 300
+# Захват видео с веб-камеры
+cap = cv2.VideoCapture(0)
 
-def draw_button(screen, x, y, width, height, text, hover):
-    color = BUTTON_HOVER_COLOR if hover else BUTTON_COLOR
-    pygame.draw.rect(screen, color, [x, y, width, height])
-    font = pygame.font.SysFont('Calibri', 25, True, False)
-    text_surface = font.render(text, True, BLACK)
-    screen.blit(text_surface, (x + 10, y + 10))
+# Создание окна для отображения камеры
+cv2.namedWindow("Camera with Gestures", cv2.WINDOW_NORMAL)
 
 while not done:
     if not game.paused:
@@ -227,42 +263,36 @@ while not done:
             if game.state == "start":
                 game.go_down()
 
+    # Захват изображения с веб-камеры
+    success, img = cap.read()
+    img = detector.findHands(img, draw=True)
+    lmList, bbox = detector.findPosition(img, draw=True)
+
+    if len(lmList) != 0:
+        fingers = detector.fingersUp()
+
+        # Управление жестами
+        if fingers[1] == 1 and fingers[4] == 0:  # Поднят указательный палец
+            game.go_side(-1)  # Движение влево
+        elif fingers[1] == 0 and fingers[4] == 1:  # Поднят мизинец
+            game.go_side(1)  # Движение вправо
+        elif fingers[1] == 1 and fingers[4] == 1:  # Подняты указательный и мизинец
+            game.rotate()  # Поворот фигуры
+
+        else:
+            pressing_down = False
+
+    # Отображение изображения с камеры в отдельном окне
+    cv2.imshow("Camera with Gestures", img)
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             done = True
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                game.rotate()
-            if event.key == pygame.K_DOWN:
-                pressing_down = True
-            if event.key == pygame.K_LEFT:
-                game.go_side(-1)
-            if event.key == pygame.K_RIGHT:
-                game.go_side(1)
-            if event.key == pygame.K_SPACE:
-                game.go_space()
             if event.key == pygame.K_ESCAPE:
-                game.__init__(20, 10)
+                game.restart()
             if event.key == pygame.K_p:
                 game.paused = not game.paused
-            if event.key == pygame.K_l:
-                game.increase_level()
-
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_pos = pygame.mouse.get_pos()
-            # Проверка клика по кнопке "Сохранить игру"
-            if button_x <= mouse_pos[0] <= button_x + button_width and button_y1 <= mouse_pos[1] <= button_y1 + button_height:
-                game.save_game('savegame.pkl')
-            # Проверка клика по кнопке "Загрузить игру"
-            if button_x <= mouse_pos[0] <= button_x + button_width and button_y2 <= mouse_pos[1] <= button_y2 + button_height:
-                game = Tetris.load_game('savegame.pkl')
-            if button_x <= mouse_pos[0] <= button_x + button_width and button_y3 <= mouse_pos[1] <= button_y3 + button_height:
-                game.__init__(20, 10)
-
-
-    if event.type == pygame.KEYUP:
-        if event.key == pygame.K_DOWN:
-            pressing_down = False
 
     screen.fill(WHITE)
 
@@ -284,17 +314,6 @@ while not done:
                                       game.y + game.zoom * (i + game.figure.y) + 1,
                                       game.zoom - 2, game.zoom - 2])
 
-    # Отрисовка кнопок
-    mouse_pos = pygame.mouse.get_pos()
-    hover_save = button_x <= mouse_pos[0] <= button_x + button_width and button_y1 <= mouse_pos[1] <= button_y1 + button_height
-    hover_load = button_x <= mouse_pos[0] <= button_x + button_width and button_y2 <= mouse_pos[1] <= button_y2 + button_height
-    hover_reset = button_x <= mouse_pos[0] <= button_x + button_width and button_y3 <= mouse_pos[1] <= button_y3 + button_height
-
-    draw_button(screen, button_x, button_y1, button_width, button_height, "Сохранить игру", hover_save)
-    draw_button(screen, button_x, button_y2, button_width, button_height, "Загрузить игру", hover_load)
-
-    draw_button(screen, button_x, button_y3, button_width, button_height, "Рестарт", hover_reset)
-
     # Отрисовка счета и состояния игры
     font = pygame.font.SysFont('Calibri', 25, True, False)
     font1 = pygame.font.SysFont('Calibri', 65, True, False)
@@ -310,4 +329,11 @@ while not done:
     pygame.display.flip()
     clock.tick(fps)
 
+    # Обработка событий OpenCV
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Освобождение ресурсов
+cap.release()
+cv2.destroyAllWindows()
 pygame.quit()
