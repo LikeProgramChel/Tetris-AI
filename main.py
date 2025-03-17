@@ -1,7 +1,32 @@
 import pygame
 import random
 import pickle
+import subprocess
+import os
+import sys
 
+# Функция для синхронизации с GitHub
+def sync_with_github():
+    try:
+        # Проверяем, существует ли папка .git (чтобы убедиться, что это репозиторий)
+        if not os.path.exists(".git"):
+            print("Папка .git не найдена. Инициализация нового репозитория...")
+            subprocess.run(["git", "init"], check=True)
+            subprocess.run(["git", "remote", "add", "origin", "https://github.com/LikeProgramChel/Tetris-AI.git"], check=True)
+
+        # Получаем последние изменения с GitHub
+        print("Получение изменений с GitHub...")
+        subprocess.run(["git", "fetch", "origin"], check=True)
+        subprocess.run(["git", "reset", "--hard", "origin/master"], check=True)
+        print("Синхронизация завершена.")
+    except subprocess.CalledProcessError as e:
+        print(f"Ошибка при синхронизации с GitHub: {e}")
+        sys.exit(1)
+
+# Синхронизация при запуске программы
+sync_with_github()
+
+# Остальной код игры...
 colors = [
     (255, 255, 255),
     (120, 37, 179),
