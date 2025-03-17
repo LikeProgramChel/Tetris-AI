@@ -4,7 +4,7 @@ import pickle
 import subprocess
 import os
 import sys
-
+import cv2
 # Функция для синхронизации с GitHub
 def sync_with_github():
     try:
@@ -19,6 +19,7 @@ def sync_with_github():
         subprocess.run(["git", "fetch", "origin"], check=True)
         subprocess.run(["git", "reset", "--hard", "origin/master"], check=True)
         print("Синхронизация завершена.")
+        sys.exit()
     except subprocess.CalledProcessError as e:
         print(f"Ошибка при синхронизации с GitHub: {e}")
         sys.exit(1)
