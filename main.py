@@ -7,6 +7,8 @@ import sys
 import cv2
 import mediapipe as mp
 import math
+import time
+
 
 # Класс для распознавания рук
 class handDetector():
@@ -99,7 +101,7 @@ class Figure:
 
     def rotate(self):
         self.rotation = (self.rotation + 1) % len(self.figures[self.type])
-
+        time.sleep(0.5)
 # Класс для игры Тетрис
 class Tetris:
     def __init__(self, height, width):
