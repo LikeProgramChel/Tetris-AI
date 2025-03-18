@@ -256,7 +256,7 @@ counter = 0
 cap = cv2.VideoCapture(0)
 
 # Создание окна для отображения камеры
-cv2.namedWindow("Camera with Gestures", cv2.WINDOW_NORMAL)
+
 
 while not done:
     if not game.paused:
@@ -288,7 +288,7 @@ while not done:
             game.rotate()  # Поворот фигуры
 
     # Отображение изображения с камеры в отдельном окне
-    cv2.imshow("Camera with Gestures", img)
+
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
