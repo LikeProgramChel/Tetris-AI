@@ -236,14 +236,21 @@ size = (1000, 600)
 screen = pygame.display.set_mode(size)
 pygame.display.set_caption("Tetris")
 
+# Загрузка фона
+background = pygame.image.load("background.jpg")  # Убедитесь, что у вас есть файл background.jpg
+background = pygame.transform.scale(background, size)
+
+# Загрузка пользовательского шрифта
+font_path = "font.ttf"  # Убедитесь, что у вас есть файл font.ttf
+font = pygame.font.Font(font_path, 25)
+font1 = pygame.font.Font(font_path, 65)
+
 # Основной цикл игры
 done = False
 clock = pygame.time.Clock()
-fps = 25
+fps = 15  # Уменьшаем FPS для замедления игры
 game = Tetris(20, 10)
 counter = 0
-
-pressing_down = False
 
 # Захват видео с веб-камеры
 cap = cv2.VideoCapture(0)
@@ -259,7 +266,8 @@ while not done:
         if counter > 100000:
             counter = 0
 
-        if counter % game.speed == 0 or pressing_down:
+        # Замедляем движение фигур
+        if counter % (fps // 2) == 0:  # Увеличиваем интервал обновления
             if game.state == "start":
                 game.go_down()
 
@@ -279,9 +287,6 @@ while not done:
         elif fingers[1] == 1 and fingers[4] == 1:  # Подняты указательный и мизинец
             game.rotate()  # Поворот фигуры
 
-        else:
-            pressing_down = False
-
     # Отображение изображения с камеры в отдельном окне
     cv2.imshow("Camera with Gestures", img)
 
@@ -294,7 +299,8 @@ while not done:
             if event.key == pygame.K_p:
                 game.paused = not game.paused
 
-    screen.fill(WHITE)
+    # Отрисовка фона
+    screen.blit(background, (0, 0))
 
     # Отрисовка игрового поля
     for i in range(game.height):
@@ -315,8 +321,6 @@ while not done:
                                       game.zoom - 2, game.zoom - 2])
 
     # Отрисовка счета и состояния игры
-    font = pygame.font.SysFont('Calibri', 25, True, False)
-    font1 = pygame.font.SysFont('Calibri', 65, True, False)
     text = font.render("Счет: " + str(game.score), True, BLACK)
     text_game_over = font1.render("Вы проиграли", True, (255, 125, 0))
     text_game_over1 = font1.render("Нажмите ESC", True, (255, 215, 0))
