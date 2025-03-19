@@ -7,9 +7,8 @@ import sys
 import cv2
 import mediapipe as mp
 import math
+import numpy as np
 import time
-
-
 # Класс для распознавания рук
 class handDetector():
     def __init__(self, mode=False, maxHands=2, modelComplexity=1, detectionCon=0.5, trackCon=0.5):
@@ -100,8 +99,9 @@ class Figure:
         return self.figures[self.type][self.rotation]
 
     def rotate(self):
-        self.rotation = (self.rotation + 1) % len(self.figures[self.type])
         time.sleep(0.5)
+        self.rotation = (self.rotation + 1) % len(self.figures[self.type])
+
 # Класс для игры Тетрис
 class Tetris:
     def __init__(self, height, width):
@@ -257,9 +257,6 @@ counter = 0
 # Захват видео с веб-камеры
 cap = cv2.VideoCapture(0)
 
-# Создание окна для отображения камеры
-
-
 while not done:
     if not game.paused:
         if game.figure is None:
@@ -289,20 +286,17 @@ while not done:
         elif fingers[1] == 1 and fingers[4] == 1:  # Подняты указательный и мизинец
             game.rotate()  # Поворот фигуры
 
-    # Отображение изображения с камеры в отдельном окне
-
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            done = True
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                game.restart()
-            if event.key == pygame.K_p:
-                game.paused = not game.paused
+    # Преобразование изображения из OpenCV в формат Pygame
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = np.rot90(img)
+    img = pygame.surfarray.make_surface(img)
+    img = pygame.transform.scale(img, (320, 240))  # Масштабирование изображения
 
     # Отрисовка фона
     screen.blit(background, (0, 0))
+
+    # Отрисовка изображения с камеры
+    screen.blit(img, (size[0] - 320, 0))  # Размещение изображения в правом верхнем углу
 
     # Отрисовка игрового поля
     for i in range(game.height):
@@ -335,9 +329,14 @@ while not done:
     pygame.display.flip()
     clock.tick(fps)
 
-    # Обработка событий OpenCV
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            done = True
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                game.restart()
+            if event.key == pygame.K_p:
+                game.paused = not game.paused
 
 # Освобождение ресурсов
 cap.release()
