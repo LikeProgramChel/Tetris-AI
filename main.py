@@ -1,15 +1,11 @@
 import pygame
 import random
 import pickle
-import subprocess
-import os
-import sys
 import cv2
 import mediapipe as mp
-import math
 import numpy as np
 import time
-
+import sys
 
 # Класс для распознавания рук
 class handDetector():
@@ -203,10 +199,6 @@ class Tetris:
         else:
             self.figure.rotation = old_rotation
 
-    def increase_level(self):
-        self.level += 1
-        self.speed = fps // self.level // 2
-
     def save_game(self, filename):
         with open(filename, 'wb') as f:
             pickle.dump(self, f)
@@ -252,13 +244,14 @@ def create_menu_buttons():
     buttons = [
         Button(button_x, 200, button_width, button_height, "Новая игра", font, BUTTON_COLOR, BUTTON_HOVER_COLOR),
         Button(button_x, 270, button_width, button_height, "Загрузить игру", font, BUTTON_COLOR, BUTTON_HOVER_COLOR),
-        Button(button_x, 340, button_width, button_height, "Выход", font, BUTTON_COLOR, BUTTON_HOVER_COLOR),
+        Button(button_x, 340, button_width, button_height, "Сохранить игру", font, BUTTON_COLOR, BUTTON_HOVER_COLOR),
+        Button(button_x, 410, button_width, button_height, "Выход", font, BUTTON_COLOR, BUTTON_HOVER_COLOR),
     ]
     return buttons
 
 
 # Функция для отображения главного меню
-def main_menu(screen, buttons):
+def main_menu(screen, buttons, game=None):
     while True:
         screen.blit(background, (0, 0))
         mouse_pos = pygame.mouse.get_pos()
@@ -278,6 +271,11 @@ def main_menu(screen, buttons):
                             return "new_game"
                         elif button.text == "Загрузить игру":
                             return "load_game"
+                        elif button.text == "Сохранить игру":
+                            if game:
+                                game.save_game("save.pkl")
+                                print("Игра сохранена!")
+                            return "continue"
                         elif button.text == "Выход":
                             return "quit"
 
@@ -291,8 +289,7 @@ pygame.mixer.init()
 pygame.mixer.music.load('background_music.mp3')
 pygame.mixer.music.play(-1)
 
-# Загрузка звуковых эффектов
-
+# Загрузка звуковых эффекто
 rotate_sound = pygame.mixer.Sound("rotate.wav")
 game_over_sound = pygame.mixer.Sound("game_over.wav")
 
@@ -430,6 +427,17 @@ while not done:
                 game.restart()
             if event.key == pygame.K_p:
                 game.paused = not game.paused
+            if event.key == pygame.K_s:  # Сохранение игры по нажатию клавиши S
+                game.save_game("save.pkl")
+                print("Игра сохранена!")
+            if event.key == pygame.K_m:  # Открытие меню по нажатию клавиши M
+                menu_result = main_menu(screen, create_menu_buttons(), game)
+                if menu_result == "new_game":
+                    game = Tetris(20, 10)
+                elif menu_result == "load_game":
+                    game = Tetris.load_game("save.pkl")
+                elif menu_result == "quit":
+                    done = True
 
 # Освобождение ресурсов
 cap.release()
