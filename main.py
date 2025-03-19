@@ -9,6 +9,8 @@ import mediapipe as mp
 import math
 import numpy as np
 import time
+
+
 # Класс для распознавания рук
 class handDetector():
     def __init__(self, mode=False, maxHands=2, modelComplexity=1, detectionCon=0.5, trackCon=0.5):
@@ -19,7 +21,8 @@ class handDetector():
         self.trackCon = trackCon
 
         self.mpHands = mp.solutions.hands
-        self.hands = self.mpHands.Hands(self.mode, self.maxHands, self.modelComplexity, self.detectionCon, self.trackCon)
+        self.hands = self.mpHands.Hands(self.mode, self.maxHands, self.modelComplexity, self.detectionCon,
+                                        self.trackCon)
         self.mpDraw = mp.solutions.drawing_utils
         self.tipIds = [4, 8, 12, 16, 20]
 
@@ -73,6 +76,7 @@ class handDetector():
                 fingers.append(0)
         return fingers
 
+
 # Класс для фигур в Тетрисе
 class Figure:
     x = 0
@@ -101,6 +105,7 @@ class Figure:
     def rotate(self):
         time.sleep(0.5)
         self.rotation = (self.rotation + 1) % len(self.figures[self.type])
+
 
 # Класс для игры Тетрис
 class Tetris:
@@ -156,6 +161,8 @@ class Tetris:
                 for i1 in range(i, 1, -1):
                     for j in range(self.width):
                         self.field[i1][j] = self.field[i1 - 1][j]
+        if lines > 0:
+            pass
         self.score += lines ** 2
 
     def go_space(self):
@@ -170,6 +177,7 @@ class Tetris:
             self.figure.y -= 1
             self.freeze()
 
+
     def freeze(self):
         for i in range(4):
             for j in range(4):
@@ -179,6 +187,7 @@ class Tetris:
         self.new_figure()
         if self.intersects():
             self.state = "gameover"
+            game_over_sound.play()  # Звук завершения игры
 
     def go_side(self, dx):
         old_x = self.figure.x
@@ -189,7 +198,9 @@ class Tetris:
     def rotate(self):
         old_rotation = self.figure.rotation
         self.figure.rotate()
-        if self.intersects():
+        if not self.intersects():
+            rotate_sound.play()  # Звук вращения фигуры
+        else:
             self.figure.rotation = old_rotation
 
     def increase_level(self):
@@ -208,11 +219,82 @@ class Tetris:
         with open(filename, 'rb') as f:
             return pickle.load(f)
 
+
+# Класс для кнопок
+class Button:
+    def __init__(self, x, y, width, height, text, font, color, hover_color):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.font = font
+        self.color = color
+        self.hover_color = hover_color
+        self.is_hovered = False
+
+    def draw(self, screen):
+        if self.is_hovered:
+            pygame.draw.rect(screen, self.hover_color, self.rect)
+        else:
+            pygame.draw.rect(screen, self.color, self.rect)
+
+        text_surface = self.font.render(self.text, True, BLACK)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        screen.blit(text_surface, text_rect)
+
+    def check_hover(self, mouse_pos):
+        self.is_hovered = self.rect.collidepoint(mouse_pos)
+
+
+# Функция для создания кнопок меню
+def create_menu_buttons():
+    button_width = 200
+    button_height = 50
+    button_x = size[0] // 2 - button_width // 2
+    buttons = [
+        Button(button_x, 200, button_width, button_height, "Новая игра", font, BUTTON_COLOR, BUTTON_HOVER_COLOR),
+        Button(button_x, 270, button_width, button_height, "Загрузить игру", font, BUTTON_COLOR, BUTTON_HOVER_COLOR),
+        Button(button_x, 340, button_width, button_height, "Выход", font, BUTTON_COLOR, BUTTON_HOVER_COLOR),
+    ]
+    return buttons
+
+
+# Функция для отображения главного меню
+def main_menu(screen, buttons):
+    while True:
+        screen.blit(background, (0, 0))
+        mouse_pos = pygame.mouse.get_pos()
+
+        for button in buttons:
+            button.check_hover(mouse_pos)
+            button.draw(screen)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return "quit"
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for button in buttons:
+                    if button.is_hovered:
+                        if button.text == "Новая игра":
+                            return "new_game"
+                        elif button.text == "Загрузить игру":
+                            return "load_game"
+                        elif button.text == "Выход":
+                            return "quit"
+
+        pygame.display.flip()
+        clock.tick(fps)
+
+
 # Инициализация игры
 pygame.init()
 pygame.mixer.init()
 pygame.mixer.music.load('background_music.mp3')
 pygame.mixer.music.play(-1)
+
+# Загрузка звуковых эффектов
+
+rotate_sound = pygame.mixer.Sound("rotate.wav")
+game_over_sound = pygame.mixer.Sound("game_over.wav")
 
 # Инициализация детектора рук
 detector = handDetector()
@@ -239,23 +321,35 @@ screen = pygame.display.set_mode(size)
 pygame.display.set_caption("Tetris")
 
 # Загрузка фона
-background = pygame.image.load("background.jpg")  # Убедитесь, что у вас есть файл background.jpg
+background = pygame.image.load("background.jpg")
 background = pygame.transform.scale(background, size)
 
 # Загрузка пользовательского шрифта
-font_path = "font.ttf"  # Убедитесь, что у вас есть файл font.ttf
+font_path = "font.ttf"
 font = pygame.font.Font(font_path, 25)
 font1 = pygame.font.Font(font_path, 65)
 
 # Основной цикл игры
 done = False
 clock = pygame.time.Clock()
-fps = 15  # Уменьшаем FPS для замедления игры
+fps = 15
 game = Tetris(20, 10)
 counter = 0
 
 # Захват видео с веб-камеры
 cap = cv2.VideoCapture(0)
+
+# Создание кнопок меню
+buttons = create_menu_buttons()
+menu_result = main_menu(screen, buttons)
+
+if menu_result == "new_game":
+    game = Tetris(20, 10)
+elif menu_result == "load_game":
+    game = Tetris.load_game("save.pkl")
+elif menu_result == "quit":
+    pygame.quit()
+    sys.exit()
 
 while not done:
     if not game.paused:
@@ -265,8 +359,7 @@ while not done:
         if counter > 100000:
             counter = 0
 
-        # Замедляем движение фигур
-        if counter % (fps // 2) == 0:  # Увеличиваем интервал обновления
+        if counter % (fps // 2) == 0:
             if game.state == "start":
                 game.go_down()
 
@@ -279,24 +372,24 @@ while not done:
         fingers = detector.fingersUp()
 
         # Управление жестами
-        if fingers[1] == 1 and fingers[4] == 0:  # Поднят указательный палец
-            game.go_side(-1)  # Движение влево
-        elif fingers[1] == 0 and fingers[4] == 1:  # Поднят мизинец
-            game.go_side(1)  # Движение вправо
-        elif fingers[1] == 1 and fingers[4] == 1:  # Подняты указательный и мизинец
-            game.rotate()  # Поворот фигуры
+        if fingers[1] == 1 and fingers[4] == 0:
+            game.go_side(-1)
+        elif fingers[1] == 0 and fingers[4] == 1:
+            game.go_side(1)
+        elif fingers[1] == 1 and fingers[4] == 1:
+            game.rotate()
 
     # Преобразование изображения из OpenCV в формат Pygame
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = np.rot90(img)
     img = pygame.surfarray.make_surface(img)
-    img = pygame.transform.scale(img, (320, 240))  # Масштабирование изображения
+    img = pygame.transform.scale(img, (320, 240))
 
     # Отрисовка фона
     screen.blit(background, (0, 0))
 
     # Отрисовка изображения с камеры
-    screen.blit(img, (size[0] - 320, 0))  # Размещение изображения в правом верхнем углу
+    screen.blit(img, (size[0] - 320, 0))
 
     # Отрисовка игрового поля
     for i in range(game.height):
